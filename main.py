@@ -405,7 +405,7 @@ def main():
             summary(model, input_size=(1, 1, 160, 160), device=device)
     
     # --jsonファイルがない画像に対し、jsonファイルを作成--
-    img_files = [f for f in os.listdir(IMG_DIR) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+    img_files = [f for f in os.listdir(DATASET_DIR) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
     img_basenames = set(os.path.splitext(f)[0] for f in img_files)
     json_files = [f for f in os.listdir(JSON_DIR) if f.lower().endswith('.json')]
     json_basenames = set(os.path.splitext(f)[0] for f in json_files)
