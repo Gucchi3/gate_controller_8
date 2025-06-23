@@ -69,6 +69,66 @@ def mean_error(model, loader, device):
                     point_errors[lbl].append(err)
     return (np.mean(errors) if errors else 0.0, errors, point_errors)
 
+def save_error_histogram(errors, session_dir, filename='error_histogram.png'):
+
+    """
+    誤差のリストを受け取り、分布のヒストグラムを画像ファイルとして保存する。
+
+    Args:
+        errors (list[float]): 誤差の値が格納されたリスト。
+        session_dir (str): 保存先セッションディレクトリ名。'log/'からの相対パス。
+        filename (str, optional): 保存するファイル名。デフォルトは 'error_histogram.png'。
+    """
+    # エラーリストが空の場合は何もしない
+    if not errors:
+        print("エラーリストが空のため、ヒストグラムは作成されませんでした。")
+        return
+
+    # --- 保存パスの準備 ---
+    # logディレクトリとセッションディレクトリを結合
+    output_dir = session_dir
+    # ディレクトリが存在しない場合は作成
+    os.makedirs(output_dir, exist_ok=True)
+    # 最終的なファイルのフルパス
+    full_path = os.path.join(output_dir, filename)
+
+    # --- 統計値の計算 ---
+    mean_val = np.mean(errors)
+    median_val = np.median(errors)
+    max_val = np.max(errors)
+
+    # --- グラフの描画 ---
+    plt.figure(figsize=(12, 7))
+
+    # ヒストグラム本体
+    # データ範囲に応じてビンの数を調整するとより見やすくなる場合があります
+    plt.hist(errors, bins=50, edgecolor='black', alpha=0.7, label='Error Frequency')
+
+    # 平均値と中央値の補助線
+    plt.axvline(mean_val, color='red', linestyle='dashed', linewidth=2, label=f'Mean: {mean_val:.2f} px')
+    plt.axvline(median_val, color='green', linestyle='dashed', linewidth=2, label=f'Median: {median_val:.2f} px')
+
+    # グラフの装飾
+    plt.title(f'Error Distribution (Max: {max_val:.2f} px)', fontsize=16)
+    plt.xlabel('Error (px)', fontsize=12)
+    plt.ylabel('Frequency (Count)', fontsize=12)
+    plt.legend()
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    
+    # x軸の範囲を調整して見やすくする（任意）
+    plt.xlim(0, max(100, max_val * 1.05)) # 少なくとも100px、または最大値より少し大きい範囲まで表示
+
+    # --- ファイルに保存してプロットを閉じる ---
+    try:
+        plt.savefig(full_path)
+        print(f"ヒストグラムを '{full_path}' に保存しました。")
+    except Exception as e:
+        print(f"グラフの保存中にエラーが発生しました: {e}")
+    finally:
+        # メモリリークを防ぐためにプロットを閉じる
+        plt.close()
+
+
 #? 誤差リストから最大値を返す
 # 入力: errors(list[float])
 # 出力: 最大誤差(float)
