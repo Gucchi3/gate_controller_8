@@ -66,9 +66,9 @@ class net1_ex(nn.Module):
         x = self.conv3(x)
         x = self.bn3(x)
         x = self.relu3(x)
-        x = self.conv3b(x)
-        x = self.bn3b(x)
-        x = self.relu3b(x)
+        # x = self.conv3b(x)
+        # x = self.bn3b(x)
+        # x = self.relu3b(x)
         x = self.pool3(x)
 
         # conv4ブロック
