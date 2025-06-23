@@ -1,16 +1,42 @@
+# What's this code?
+    このコードは、入力された画像から(x,y, x,y, x,y, x,y)の四点を推論することができるCNNです。
+    ！！！！------グレースケール（1ch入力）専用です。------！！！！
+
+    学習、推論、onnx出力などの実行機能はすべてmain.pyにあります。「python main.py」でそのまま実行してください。
+    細かな機能関数はutils.pyに記述してあります。utils.pyを実行することはありません。
+    設定類はすべてconfg.pyに記述してあります。config.pyを実行することはありません。
+    ネットワークの定義はnetsフォルダ内に定義してあります。main.pyの先頭で使用するネットワークを選択できます。
+    
+    環境構築は以下に示してあります。
+
+    Rabelmeを用いてアノテーションしてください。四つのポイントの名前はデフォルトで[1, 2, 3, 4]です。config.pyで変えられます。変更の際はアノテーションの名前も変えてください。
+
+    データセットは、画像をdatasetフォルダに、jsonファイルをjsonフォルダへ格納してください。jsonフォルダがなくても画像があれば学習できます。jsonファイル内の"ImagePath"だけは画像と対応しているのか確認してください。ここを参照してdatasetフォルダ内の画像とjsonファイルを紐づけています。
+
+    アノテーションがちゃんと反映されているかは、main.pyを実行して「log」フォルダ内の、「input_img」フォルダを確認してください。入力画像にアノテーションが反映された画像が保存されます。データ拡張に関しても、「input_img」を確認することで正常に拡張されているのかが確認できます。
+
+    コード使用時にはvscodeの折り畳み機能を使って関数を折りたたんで、都度開く感じをお勧めします。
+
+    一応関数の上部にinput、outputを記載したり、main.pyの一番下に流れを書いてますが、いろいろ変更したり、そもそもAIが作成したので、あっている保証はありません。もう一度AIに作成をお願いしたほうがいいかも。
+
+# What's to_160.py?
+    これは指定したフォルダ内の画像をすべて中心から上下左右に80ピクセル切り取って160x160にするコードです。コード下部で対象フォルダと出力フォルダを指定できます。
+
+
+
+
+
+
+
 # 修正待ち
     データセットが少なすぎて、ヒートマップの関数が正常に動作しているのか分からない。
-    このリポジトリが何かの説明文の追加
-    jsonファイルがない画像を学習に使用できるようにする。
 
 # 追加予定機能
-
-
     量子化機能の追加。
     gap8用Cコードの生成機能の追加。
 
 # 修正・追加中事項
- 
+    正規データセットの追加
   
 
 # 注意事項
@@ -18,7 +44,7 @@
     2025-06-10 14:20:32,471 INFO Using categorical units to plot a list of strings that are all parsable as floats or dates. If these strings should be plotted as numbers, cast to the appropriate data type before plotting.
     2025-06-10 14:20:32,472 INFO Using categorical units to plot a list of strings that are all parsable as floats or dates. If these strings should be plotted as numbers, cast to the appropriate data type before plotting.
 
-    学習時などにこのような警告文が出るが、無視して問題ない。
+    学習時などにこのような警告文が出るが、無視して問題ない。ポイントの名前が数字だと、グラフ表示時に注意が入るらしい。
 
 # anaconda を用いた環境構築
 
