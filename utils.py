@@ -67,7 +67,7 @@ def mean_error(model, loader, device):
                     err *=input_size
                     errors.append(err)
                     point_errors[lbl].append(err)
-    return (np.mean(errors) if errors else 0.0, errors, point_errors)
+    return (np.mean(errors) if errors else 0.0, errors, point_errors,np.median(errors) )
 
 def save_error_histogram(errors, session_dir, filename='error_histogram.png'):
 
