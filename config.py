@@ -1,7 +1,7 @@
 import os
 
 #共通設定値（パス、ハイパーパラメータ、カラーマップなど）
-PARENT_DIR    = r'/home/ihpc-3090ti/SSD2/yamaguchi-k/gate_controller_stable'   # 親フォルダ
+PARENT_DIR    = r'.'   # 親フォルダ
 IMG_DIR       = os.path.join(PARENT_DIR, 'img')      # 推論用画像フォルダ
 DATASET_DIR   = os.path.join(PARENT_DIR, 'dataset')  # 学習用画像フォルダ
 JSON_DIR      = os.path.join(PARENT_DIR, 'json')     # <parent>/json
@@ -9,9 +9,9 @@ OUT_DIR       = os.path.join(PARENT_DIR, 'log')      # モデル・ログ保存�
 IMG_OUT_DIR   = os.path.join(PARENT_DIR, 'img_out')  # 予測画像出力先
 HEATIMG_OUT_DIR   = os.path.join(PARENT_DIR, 'log/heatmap')  # 予測画像出力先
 INPUT_SIZE    = (160, 160)      # 入力画像サイズ (H, W)
-BATCH_SIZE    = 5               # バッチサイズ
+BATCH_SIZE    = 10               # バッチサイズ
 LEARNING_RATE = 1e-4            # 学習率
-EPOCHS        = 2000              # 学習エポック数
+EPOCHS        = 1000              # 学習エポック数
 EVAL_PERIOD   = 50               # 何エポックごとに評価を行うか
 NUM_WORKERS   = 4               # DataLoader workers
 DIST_THRESH   = 5.0             #  
@@ -22,7 +22,7 @@ HEATMAP_IMG_CMAP = 'Reds' # 画像ごと誤差ヒートマップ用カラーマ�
 FEATUREMAP_CMAP = 'gray' # 特徴マップ可視化用カラーマップ
 # グラフ色指定（mean, top, right, left, bottom）
 MEAN_ERROR_CURVE_COLOR = "#5ea6ff"  # パステルブルー
-POINT_ERROR_COLORS = ["#fd5162",  "#64f884",  "#fab662",  "#b964ff" ]
+POINT_ERROR_COLORS = ["red",  "green",  "yellow",  "blue" ]
 POINT_LABEL = ["1", "2", "3", "4"]
 SHOW_SUMMAR = 1 #ネットワーク構造を出力するか
 
@@ -34,13 +34,13 @@ ROTATE_PROB = 0.5       # ランダム回転の確率
 ROTATE_DEGREE = 15      # 回転角度の最大値（±）
 SCALE_PROB = 0.6        # 拡大縮小の確率
 SCALE_RANGE = (0.4,1.2) # 拡大縮小の倍率範囲（min, max）
-CONTRAST_PROB = 0.5     # コントラスト変換の確率
+CONTRAST_PROB = 0     # コントラスト変換の確率
 CONTRAST_RANGE = (0.6, 1.4) # コントラスト倍率範囲
-BRIGHTNESS_PROB = 0.5   # 明るさ変換の確率
+BRIGHTNESS_PROB = 0   # 明るさ変換の確率
 BRIGHTNESS_RANGE = (0.6, 1.4) # 明るさ倍率範囲
-SHARPNESS_PROB = 0.5  # シャープネス変換の確率
+SHARPNESS_PROB = 0  # シャープネス変換の確率
 SHARPNESS_RANGE = (0.6, 1.4) # シャープネス倍率範囲
-NOIZ_PROB  =  0.5  #ノイズ付加確率
+NOIZ_PROB  =  0  #ノイズ付加確率
 NOIZ_MU  = 0
 NOIZ_SIGMA = 10
 BLUR_PROB = 0.5
