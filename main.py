@@ -673,6 +673,19 @@ def main():
         max_err = max_error(errors)
         acc5 = accuracy_at_threshold(errors, 5.0)
         acc10 = accuracy_at_threshold(errors, 10.0)
+        # --- 四分位点でエラー画像抽出 ---
+        q = 0.75  # 第3四分位
+        qval = np.quantile(errors, q)
+        # test_loader.dataset.items から画像ファイル名リスト取得
+        if hasattr(test_loader.dataset, 'items'):
+            img_names = [item['image'] for item in test_loader.dataset.items]
+        else:
+            img_names = [str(i) for i in range(len(errors))]
+        N = min(len(errors), len(img_names))
+        bad_imgs = [(img_names[i], errors[i]) for i, e in enumerate(errors[:N]) if e >= qval]
+        print(f"第{int(q*100)}パーセンタイル({qval:.2f})以上のエラー画像リスト:")
+        for name, err in bad_imgs:
+            print(f"{name}: {err:.4f}")
         # --- 点ごとの平均誤差グラフ ---
         point_labels = REQUIRED_LABELS
         point_means = [np.mean(point_errors[lbl]) if len(point_errors[lbl]) > 0 else 0.0 for lbl in point_labels]
