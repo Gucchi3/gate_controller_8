@@ -35,7 +35,8 @@ from config import (
     BRIGHTNESS_RANGE, SHARPNESS_PROB, SHARPNESS_RANGE,POINT_LABEL,NOIZ_PROB,BLUR_PROB
 )
 from utils import   heatmap,split_dataset, mean_error, max_error, accuracy_at_threshold, plot_heatmap, \
-                    predict_with_features,  predict_and_plot,worker_init_fn,yolo_dataset_collate, heatmap
+                    predict_with_features,  predict_and_plot,worker_init_fn,yolo_dataset_collate, heatmap,\
+                    save_error_histogram
 from nets.net1 import net1_ex
 
 input_size = INPUT_SIZE[0]
@@ -47,6 +48,33 @@ NETWORK = net1_ex()
 REQUIRED_LABELS = POINT_LABEL
 
 
+import torch
+import torch.nn as nn
+
+class WingLoss(nn.Module):
+    def __init__(self, w=10, epsilon=2):
+        super(WingLoss, self).__init__()
+        self.w = w
+        self.epsilon = epsilon
+        # C = w - w * ln(1 + w/epsilon)
+        self.C = self.w - self.w * math.log(1 + self.w / self.epsilon)
+
+    def forward(self, pred, target, mask=None):
+        # 誤差を計算
+        delta = (pred - target).abs()
+        
+        # 損失を計算
+        loss_small = self.w * torch.log(1 + delta / self.epsilon)
+        loss_large = delta - self.C
+        
+        loss = torch.where(delta < self.w, loss_small, loss_large)
+        
+        # マスクを適用
+        if mask is not None:
+            loss = loss * mask
+            return loss.sum() / (mask.sum() + 1e-6)
+        else:
+            return loss.mean()
 #?--------------------------------------------------------------------------------------
 #?　Dataset
 #? -------------------------------------------------------------------------------------
@@ -162,70 +190,81 @@ class LabelMeCornerDataset(Dataset):
                 #? 1. 左右反転
                 if random.random() < FLIP_PROB:
                     img = img.transpose(Image.FLIP_LEFT_RIGHT)  # --- 画像の反転 ---
-                    pts[:, 0] = w0 - 1 - pts[:, 0]  # --- w0 には 160 が格納されている。画像は 0~159 のため、w0 -1 -pts で反転 ---
-                    # ラベル順序も反転（top, right, left, bottom → top, left, right, bottom）
-                    pts[[1, 3]] = pts[[3, 1]]
-                    #* 20250609 
+
+                    # 現時点での有効/無効マスクをNumpy配列で取得
+                    mask_np = np.array(mask, dtype=np.float32).reshape(-1, 2)
+                    valid_indices = mask_np[:, 0] == 1.0
+
+                    # ★修正点1: 有効なキーポイントのx座標「だけ」を反転
+                    pts[valid_indices, 0] = w0 - 1 - pts[valid_indices, 0]
+
+                    # 座標のラベル（行）を入れ替える
+                    pts[[0, 1, 2, 3]] = pts[[1, 0, 3, 2]]
+                    
+                    # ★修正点2: 座標と同様にマスクも入れ替える
+                    mask_np[[0, 1, 2, 3]] = mask_np[[1, 0, 3, 2]]
+                    mask = mask_np.flatten().tolist()
+
                 #? 2. 拡大縮小
                 if random.random() < SCALE_PROB:
-                    scale = random.uniform(SCALE_RANGE[0], SCALE_RANGE[1])   # 拡大縮小率をランダムに選択
-                    nw, nh = int(w0 * scale), int(h0 * scale)                # 新しい画像サイズを計算
-                    img = img.resize((nw, nh), resample=Image.BILINEAR)      # 画像をリサイズ（バイリニア補完）
-                    pts = pts * scale                                        # アノテーションも同じ倍率で拡大縮小
+                    scale = random.uniform(SCALE_RANGE[0], SCALE_RANGE[1])
+                    nw, nh = int(w0 * scale), int(h0 * scale)
+                    img = img.resize((nw, nh), resample=Image.BILINEAR)
+                    
+                    # ★修正点3: 有効なキーポイントの座標「だけ」を拡大縮小
+                    mask_np = np.array(mask, dtype=np.float32).reshape(-1, 2)
+                    valid_indices = mask_np[:, 0] == 1.0
+                    pts[valid_indices] = pts[valid_indices] * scale
 
-                    # 元サイズに戻す（中央切り出し or パディング）
                     if scale >= 1.0:
-                        # ── 拡大 → 中央を切り出し ─────────────────────────────
                         left = (nw - w0) // 2
                         upper = (nh - h0) // 2
                         img = img.crop((left, upper, left + w0, upper + h0))
-                        pts = pts - [left, upper]
-
-                        # 画像外に出たキーポイントはマスクを 0 に
+                        
+                        # ★修正点4: 有効なキーポイントの座標「だけ」をシフト
+                        pts[valid_indices] = pts[valid_indices] - [left, upper]
+                        
+                        # (この後のマスク更新処理は有効なので残す)
                         oob = (pts[:, 0] < 0) | (pts[:, 0] >= w0) | (pts[:, 1] < 0) | (pts[:, 1] >= h0)
-                        mask_np = np.array(mask, dtype=np.float32).reshape(-1, 2)
                         mask_np[oob, :] = 0.0
                         mask = mask_np.flatten().tolist()
                     else:
-                        # ── 縮小 → ランダム配置（四隅 or 中央） ─────────────────
-                        new_img = Image.new('L', (w0, h0), 0)  # 160×160 の黒背景を用意
-
-                        # 5 通りからランダムに配置位置 (left, upper) を選択
+                        new_img = Image.new('L', (w0, h0), 0)
                         positions = [
-                            (0, 0),                         # 左上
-                            (w0 - nw, 0),                   # 右上
-                            (0, h0 - nh),                   # 左下
-                            (w0 - nw, h0 - nh),             # 右下
-                            ((w0 - nw) // 2, (h0 - nh) // 2)  # 中央
+                            (0, 0), (w0 - nw, 0), (0, h0 - nh),
+                            (w0 - nw, h0 - nh), ((w0 - nw) // 2, (h0 - nh) // 2)
                         ]
                         left, upper = random.choice(positions)
-
-                        new_img.paste(img, (left, upper))  # リサイズ済み画像を貼り付け
+                        new_img.paste(img, (left, upper))
                         img = new_img
-                        pts = pts + [left, upper]  # アノテーションをシフト
+                        
+                        # ★修正点5: 有効なキーポイントの座標「だけ」をシフト
+                        pts[valid_indices] = pts[valid_indices] + [left, upper]
 
-                        # 縮小配置の場合、画像外に出ることは無いのでマスク更新不要                
                 #? 3. ランダム回転
                 if random.random() < ROTATE_PROB:
-                    angle = random.uniform(-ROTATE_DEGREE, ROTATE_DEGREE)  # 回転角をランダムに決定
-                    img = img.rotate(angle, resample=Image.BILINEAR)  # 画像回転、バイリニア補完
+                    angle = random.uniform(-ROTATE_DEGREE, ROTATE_DEGREE)
+                    img = img.rotate(angle, resample=Image.BILINEAR)
+                    
+                    # ★修正点6: 有効なキーポイントの座標「だけ」を回転
+                    mask_np = np.array(mask, dtype=np.float32).reshape(-1, 2)
+                    valid_indices = mask_np[:, 0] == 1.0
+
+                    cx, cy = w0 / 2, h0 / 2
+                    angle_r = math.radians(-angle)
+                    
+                    # 中心からの相対座標に変換
+                    x0 = pts[valid_indices, 0] - cx
+                    y0 = pts[valid_indices, 1] - cy
+                    
+                    # 回転後の座標を計算して更新
+                    pts[valid_indices, 0] = cx + (x0) * math.cos(angle_r) - (y0) * math.sin(angle_r)
+                    pts[valid_indices, 1] = cy + (x0) * math.sin(angle_r) + (y0) * math.cos(angle_r)   
+
+
                     #!==Pillowは画像の左上を中心として、Θ>0の時に「「「時計回り」」」に回転する。
                             #!===しかし、Pillowではなく数学的に回転させると、画像の左下を中心として、「「「反時計回り」」」に回転する。
                                 #!===よって、Pillowと数学的回転では回転方向が違うため、angleに×(-1)をかけて逆方向の角度を指定しなければならない。
-                    # 座標も回転
-                    cx, cy = w0 / 2, h0 / 2
-                    angle_r = math.radians(-angle)#!×(-1)に注意!!!
-                    #print(f"angle：{angle}　　angle_rad：{angle_r}") #DEBUG
-                    x0 = pts[:, 0] - cx
-                    y0 = pts[:, 1] - cy
-                    pts[:, 0] =  cx +(x0)*math.cos(angle_r) - (y0)*math.sin(angle_r)
-                    pts[:, 1] = cy + (x0)*math.sin(angle_r) + (y0)*math.cos(angle_r)
-
-                    # for i ,(x, y) in enumerate(pts): #maskは__getitemの最後で定義してた(*´ω｀*)
-                    #     if x < 0 or input_size <= x:
-                    #         mask[i, 0] = 0
-                    #     if y < 0 or input_size <= y:(*´ω｀*)
-                    #         mask[i, 1] =  
                 #? 4. コントラスト変換
                 if random.random() < CONTRAST_PROB:
                     from PIL import ImageEnhance
@@ -253,6 +292,14 @@ class LabelMeCornerDataset(Dataset):
                 if random.random() < BLUR_PROB:
                     img = img.filter(ImageFilter.SMOOTH)
 
+        for i, (x, y) in enumerate(pts):
+                if x < 0 or input_size <= x:
+                    mask[i*2] = 0
+                    mask[i*2+1] = 0
+                if y < 0 or input_size <= y:
+                    mask[i*2+1] = 0
+                    mask[i*2] = 0
+
                     
 
                 
@@ -267,7 +314,7 @@ class LabelMeCornerDataset(Dataset):
             draw = ImageDraw.Draw(img_pil)
             pts_arr = np.array(pts).reshape(4,2)
             mask_arr = np.array(mask).reshape(4,2)
-            colors = ['red','blue','green','yellow']
+            colors = ['red','green','yellow','blue']
             #print(f"[DEBUG] image={rec['image']}, w0={w0}, h0={h0}, img_pil.size={img_pil.size}")
            # print(f"[DEBUG] pts={pts_arr}")
             for j, (pt, m) in enumerate(zip(pts_arr, mask_arr)):
@@ -291,6 +338,8 @@ class LabelMeCornerDataset(Dataset):
 
         # ファイル名と正解座標を表示
         #print(f"{rec['image']}: top{tuple(pts[0])}, right{tuple(pts[1])}, left{tuple(pts[2])}, bottom{tuple(pts[3])}")
+        # maskの値を表示
+        #print(f"{rec['image']}: mask0={mask[0:2]}, mask1={mask[2:4]}, mask2={mask[4:6]}, mask3={mask[6:8]}")
         return (
             tensor_img,
             torch.tensor(pts_normalized, dtype=torch.float32),
@@ -330,19 +379,14 @@ def train_one_epoch(model, loader, optimizer, device, writer, epoch):
     model.train()
     running_loss = 0.0
     img_save_count = 0
-    from config import GATE_EXIST_LOSS_WEIGHT
+    wing_loss = WingLoss().to(device)
     for imgs, targets, masks  in tqdm(loader, desc=f"Epoch {epoch} Train", leave=False):
         imgs, targets, masks = imgs.to(device), targets.to(device), masks.to(device)
         out = model(imgs)  # [B, 8]
         preds = out  # [B,8] 4点座標
-
-            
-  
         # 座標損失
-        loss_coords = F.smooth_l1_loss(preds * masks, targets * masks, reduction='sum') / (masks.sum() + 1e-6)
-        loss_coords = input_size * loss_coords#160*loss_coords
-
-        loss = 4 * loss_coords + GATE_EXIST_LOSS_WEIGHT  
+        loss_coords = wing_loss(preds, targets, masks)
+        loss =  input_size * loss_coords
         optimizer.zero_grad(); loss.backward(); optimizer.step()
         running_loss += loss.item() * imgs.size(0)
 
@@ -357,15 +401,15 @@ def validate(model, loader, device, writer, epoch, tag='val'):
     global input_size
     model.eval()
     running_loss = 0.0
+    wing_loss = WingLoss().to(device)
     from config import GATE_EXIST_LOSS_WEIGHT
     with torch.no_grad():
         for imgs, targets, masks in tqdm(loader, desc=f"{tag} {epoch}", leave=False):
             imgs, targets, masks = imgs.to(device), targets.to(device), masks.to(device)
             out = model(imgs)  # [B, 8]
             preds = out  # [B,8]
-            loss_coords = F.smooth_l1_loss(preds * masks, targets * masks, reduction='sum') / (masks.sum() + 1e-6)
-            loss_coords = input_size * loss_coords
-            loss = 4 * loss_coords + GATE_EXIST_LOSS_WEIGHT 
+            loss_coords = wing_loss(preds, targets, masks)
+            loss =  input_size * loss_coords 
             running_loss += loss.item() * imgs.size(0)
     avg = running_loss / len(loader.dataset)
     writer.add_scalar(f'Loss/{tag}', avg, epoch)
@@ -379,6 +423,7 @@ def validate(model, loader, device, writer, epoch, tag='val'):
 # 入力: なし（コマンドライン入力）
 # 出力: なし
 def main():
+    import torchvision.models as models
     print("""
 ==== 機能選択 ====
 1. train         : 学習
@@ -423,7 +468,6 @@ def main():
             json.dump(data, f ,indent=2)
     
     if mode == '1':
-        
         metric_epochs   = []   
         mean_err_values = []   
         point_err_history = {lbl: [] for lbl in REQUIRED_LABELS}  # 各点のエポックごとの誤差推移
@@ -526,7 +570,7 @@ def main():
             # ==============================
             return 0
         
-        optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)#--optimizerはAdamを使用してる--#
+        optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-4, eps=1e-08,amsgrad=True)#--optimizerはAdamを使用してる--#
         writer    = SummaryWriter(log_dir=session_dir)
         best_val  = float('inf')
 
@@ -561,6 +605,7 @@ def main():
             if ep % DIST_THRESH == 0:
                 # --- 指標計算 ---
                 mean_err, errors, point_errors = mean_error(model, test_loader, device)
+                save_error_histogram(errors, session_dir)
                 max_err = max_error(errors)
                 acc5 = accuracy_at_threshold(errors, 5.0)
                 acc10 = accuracy_at_threshold(errors, 10.0)
@@ -620,6 +665,7 @@ def main():
                 
         # --- 指標計算 ---
         mean_err, errors, point_errors = mean_error(model, test_loader, device)
+        save_error_histogram(errors, session_dir)
         max_err = max_error(errors)
         acc5 = accuracy_at_threshold(errors, 5.0)
         acc10 = accuracy_at_threshold(errors, 10.0)
@@ -698,7 +744,7 @@ def main():
         ckpt = PRED_CKPT
         model.load_state_dict(torch.load(ckpt, map_location=device,weights_only=True))
         model.eval()
-        img_paths = sorted(glob(os.path.join(IMG_DIR, '*.jpg')))
+        img_paths = sorted(glob(os.path.join(IMG_DIR, '*.png')))
         results = []
         for imgp in img_paths:
             pts, out_path = predict_and_plot(model, imgp, device)
