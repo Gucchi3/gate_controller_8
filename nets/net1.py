@@ -41,25 +41,25 @@ class net1_ex(nn.Module):
         self.relu4b = nn.ReLU(inplace=True)
         self.pool4 = nn.MaxPool2d(2)  # 20 -> 10
 
-        self.fc = nn.Linear(10*10*48, 9)  # 1x9
+        self.fc = nn.Linear(10*10*48, 8)  # 1x9
 
     def forward(self, x):
         # conv1ブロック
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu1(x)
-        x = self.conv1b(x)
-        x = self.bn1b(x)
-        x = self.relu1b(x)
+        # x = self.conv1b(x)
+        # x = self.bn1b(x)
+        # x = self.relu1b(x)
         x = self.pool1(x)
 
         # conv2ブロック
         x = self.conv2(x)
         x = self.bn2(x)
         x = self.relu2(x)
-        x = self.conv2b(x)
-        x = self.bn2b(x)
-        x = self.relu2b(x)
+        # x = self.conv2b(x)
+        # x = self.bn2b(x)
+        # x = self.relu2b(x)
         x = self.pool2(x)
 
         # conv3ブロック
@@ -75,9 +75,9 @@ class net1_ex(nn.Module):
         x = self.conv4(x)
         x = self.bn4(x)
         x = self.relu4(x)
-        x = self.conv4b(x)
-        x = self.bn4b(x)
-        x = self.relu4b(x)
+        # x = self.conv4b(x)
+        # x = self.bn4b(x)
+        # x = self.relu4b(x)
         x = self.pool4(x)
 
         x = torch.flatten(x, 1)
