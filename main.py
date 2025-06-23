@@ -245,26 +245,52 @@ class LabelMeCornerDataset(Dataset):
                 if random.random() < ROTATE_PROB:
                     angle = random.uniform(-ROTATE_DEGREE, ROTATE_DEGREE)
                     img = img.rotate(angle, resample=Image.BILINEAR)
-                    
                     # ★修正点6: 有効なキーポイントの座標「だけ」を回転
                     mask_np = np.array(mask, dtype=np.float32).reshape(-1, 2)
                     valid_indices = mask_np[:, 0] == 1.0
-
                     cx, cy = w0 / 2, h0 / 2
                     angle_r = math.radians(-angle)
-                    
                     # 中心からの相対座標に変換
                     x0 = pts[valid_indices, 0] - cx
                     y0 = pts[valid_indices, 1] - cy
-                    
                     # 回転後の座標を計算して更新
                     pts[valid_indices, 0] = cx + (x0) * math.cos(angle_r) - (y0) * math.sin(angle_r)
                     pts[valid_indices, 1] = cy + (x0) * math.sin(angle_r) + (y0) * math.cos(angle_r)   
 
-
-                    #!==Pillowは画像の左上を中心として、Θ>0の時に「「「時計回り」」」に回転する。
-                            #!===しかし、Pillowではなく数学的に回転させると、画像の左下を中心として、「「「反時計回り」」」に回転する。
-                                #!===よって、Pillowと数学的回転では回転方向が違うため、angleに×(-1)をかけて逆方向の角度を指定しなければならない。
+                #? 3.5. 背景の一部を黒く塗りつぶす（ゲート領域はマスク）
+                from config import BG_MASK_PROB, BG_MASK_RECT_MIN, BG_MASK_RECT_MAX, BG_MASK_LINE_WIDTH, BG_MASK_CIRCLE_RADIUS, BG_MASK_MARGIN
+                import cv2
+                if random.random() < BG_MASK_PROB and any(mask):
+                    pts_valid = [tuple(pts[i]) for i in range(len(pts)) if mask[i*2] > 0 and mask[i*2+1] > 0]
+                    mask_img = Image.new('L', img.size, 0)
+                    draw = ImageDraw.Draw(mask_img)
+                    if len(pts_valid) >= 3:
+                        draw.polygon(pts_valid, outline=1, fill=1)
+                    elif len(pts_valid) == 2:
+                        draw.line(pts_valid, fill=1, width=BG_MASK_LINE_WIDTH)
+                        r = BG_MASK_CIRCLE_RADIUS
+                        for x, y in pts_valid:
+                            draw.ellipse((x-r, y-r, x+r, y+r), fill=1)
+                    elif len(pts_valid) == 1:
+                        x, y = pts_valid[0]
+                        r = BG_MASK_CIRCLE_RADIUS
+                        draw.ellipse((x-r, y-r, x+r, y+r), fill=1)
+                    mask_np = np.array(mask_img)
+                    # --- ここでマスクを膨張 ---
+                    if BG_MASK_MARGIN > 0:
+                        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (BG_MASK_MARGIN*2+1, BG_MASK_MARGIN*2+1))
+                        mask_np = cv2.dilate(mask_np, kernel)
+                    img_np = np.array(img).copy()
+                    h, w = img_np.shape
+                    for _ in range(5):
+                        rw = random.randint(BG_MASK_RECT_MIN, BG_MASK_RECT_MAX)
+                        rh = random.randint(BG_MASK_RECT_MIN, BG_MASK_RECT_MAX)
+                        rx = random.randint(0, w - rw)
+                        ry = random.randint(0, h - rh)
+                        if np.all(mask_np[ry:ry+rh, rx:rx+rw] == 0):
+                            img_np[ry:ry+rh, rx:rx+rw] = 0
+                            break
+                    img = Image.fromarray(img_np)
                 #? 4. コントラスト変換
                 if random.random() < CONTRAST_PROB:
                     from PIL import ImageEnhance

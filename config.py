@@ -11,7 +11,7 @@ HEATIMG_OUT_DIR   = os.path.join(PARENT_DIR, 'log/heatmap')  # 予測画像出�
 INPUT_SIZE    = (160, 160)      # 入力画像サイズ (H, W)
 BATCH_SIZE    = 10               # バッチサイズ
 LEARNING_RATE = 1e-3            # 学習率
-EPOCHS        = 1000              # 学習エポック数
+EPOCHS        = 2000              # 学習エポック数
 EVAL_PERIOD   = 50               # 何エポックごとに評価を行うか
 NUM_WORKERS   = 4               # DataLoader workers
 DIST_THRESH   = 5.0             #  
@@ -53,3 +53,11 @@ INPUT_IMG_DIR = r'log/input_img'  # 保存先ディレクトリ名
 GATE_EXIST_LOSS_WEIGHT = 1.0  # 必要に応じて調整
 # ゲート存在判定の閾値
 GATE_EXIST_THRESH = 0.5
+
+# 背景マスク拡張用パラメータ
+BG_MASK_PROB = 1  # 適用確率（例: 0.3=30%）
+BG_MASK_RECT_MIN = 20  # 塗りつぶし矩形の最小一辺
+BG_MASK_RECT_MAX = 70  # 塗りつぶし矩形の最大一辺
+BG_MASK_MARGIN = 10  # ゲートから最低何ピクセル離すか
+BG_MASK_LINE_WIDTH = 10  # 2点時の線の太さ
+BG_MASK_CIRCLE_RADIUS = 10  # 1点/2点時の円の半径
