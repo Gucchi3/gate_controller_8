@@ -324,7 +324,11 @@ class LabelMeCornerDataset(Dataset):
                     r = 4
                     #print(f"[DEBUG] {rec['image']} pt{j}: 元座標=({pt[0]:.2f},{pt[1]:.2f}) → plot=({x},{y}) on image size {img_pil.size}")
                     draw.ellipse((x-r, y-r, x+r, y+r), fill=colors[j])
-            img_pil.save(os.path.join(INPUT_IMG_DIR, f"{os.path.splitext(os.path.basename(rec['image']))[0]}_ann.png"))
+            # 保存前にディレクトリが存在するか確認し、なければ作成
+            save_dir = os.path.join(INPUT_IMG_DIR)
+            os.makedirs(save_dir, exist_ok=True)
+            save_path = os.path.join(save_dir, f"{os.path.splitext(os.path.basename(rec['image']))[0]}_ann.png")
+            img_pil.save(save_path)
         # 「正規化ラベル」を作成する部分
         pts_normalized = []
         for x, y in pts:
