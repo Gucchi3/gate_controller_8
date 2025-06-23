@@ -56,6 +56,7 @@ GATE_EXIST_THRESH = 0.5
 
 # 背景マスク拡張用パラメータ
 BG_MASK_PROB = 1  # 適用確率（例: 0.3=30%）
+NUM_MASK = 3     #マスク数
 BG_MASK_RECT_MIN = 20  # 塗りつぶし矩形の最小一辺
 BG_MASK_RECT_MAX = 70  # 塗りつぶし矩形の最大一辺
 BG_MASK_MARGIN = 10  # ゲートから最低何ピクセル離すか

@@ -32,7 +32,7 @@ from config import (
     NUM_WORKERS, DIST_THRESH, PRED_CKPT,MEAN_ERROR_CURVE_COLOR, POINT_ERROR_COLORS,SHOW_SUMMAR,
     AUGMENTATION_ENABLED, FLIP_PROB, ROTATE_PROB, ROTATE_DEGREE, SCALE_PROB, SCALE_RANGE,
     SAVE_INPUT_IMG, INPUT_IMG_DIR,NOIZ_MU, NOIZ_SIGMA,CONTRAST_PROB, CONTRAST_RANGE, BRIGHTNESS_PROB, 
-    BRIGHTNESS_RANGE, SHARPNESS_PROB, SHARPNESS_RANGE,POINT_LABEL,NOIZ_PROB,BLUR_PROB
+    BRIGHTNESS_RANGE, SHARPNESS_PROB, SHARPNESS_RANGE,POINT_LABEL,NOIZ_PROB,BLUR_PROB,NUM_MASK
 )
 from utils import   heatmap,split_dataset, mean_error, max_error, accuracy_at_threshold, plot_heatmap, \
                     predict_with_features,  predict_and_plot,worker_init_fn,yolo_dataset_collate, heatmap,\
@@ -187,6 +187,41 @@ class LabelMeCornerDataset(Dataset):
             #? augmentations (trainのみ)
             # !--- 画像拡張系の関数の追加時は要検証!! ---
             if self.is_train and AUGMENTATION_ENABLED:
+                #? 3.5. 背景の一部を黒く塗りつぶす（ゲート領域はマスク）
+                from config import BG_MASK_PROB, BG_MASK_RECT_MIN, BG_MASK_RECT_MAX, BG_MASK_LINE_WIDTH, BG_MASK_CIRCLE_RADIUS, BG_MASK_MARGIN
+                import cv2
+                if random.random() < BG_MASK_PROB and any(mask):
+                    pts_valid = [tuple(pts[i]) for i in range(len(pts)) if mask[i*2] > 0 and mask[i*2+1] > 0]
+                    mask_img = Image.new('L', img.size, 0)
+                    draw = ImageDraw.Draw(mask_img)
+                    if len(pts_valid) >= 3:
+                        draw.polygon(pts_valid, outline=1, fill=1)
+                    elif len(pts_valid) == 2:
+                        draw.line(pts_valid, fill=1, width=BG_MASK_LINE_WIDTH)
+                        r = BG_MASK_CIRCLE_RADIUS
+                        for x, y in pts_valid:
+                            draw.ellipse((x-r, y-r, x+r, y+r), fill=1)
+                    elif len(pts_valid) == 1:
+                        x, y = pts_valid[0]
+                        r = BG_MASK_CIRCLE_RADIUS
+                        draw.ellipse((x-r, y-r, x+r, y+r), fill=1)
+                    mask_np = np.array(mask_img)
+                    # --- ここでマスクを膨張 ---
+                    if BG_MASK_MARGIN > 0:
+                        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (BG_MASK_MARGIN*2+1, BG_MASK_MARGIN*2+1))
+                        mask_np = cv2.dilate(mask_np, kernel)
+                    img_np = np.array(img).copy()
+                    h, w = img_np.shape
+                    for _ in range(NUM_MASK):
+                        for _ in range(5):
+                            rw = random.randint(BG_MASK_RECT_MIN, BG_MASK_RECT_MAX)
+                            rh = random.randint(BG_MASK_RECT_MIN, BG_MASK_RECT_MAX)
+                            rx = random.randint(0, w - rw)
+                            ry = random.randint(0, h - rh)
+                            if np.all(mask_np[ry:ry+rh, rx:rx+rw] == 0):
+                                img_np[ry:ry+rh, rx:rx+rw] = 0
+                                break
+                    img = Image.fromarray(img_np)
                 #? 1. 左右反転
                 if random.random() < FLIP_PROB:
                     img = img.transpose(Image.FLIP_LEFT_RIGHT)  # --- 画像の反転 ---
@@ -204,7 +239,6 @@ class LabelMeCornerDataset(Dataset):
                     # ★修正点2: 座標と同様にマスクも入れ替える
                     mask_np[[0, 1, 2, 3]] = mask_np[[1, 0, 3, 2]]
                     mask = mask_np.flatten().tolist()
-
                 #? 2. 拡大縮小
                 if random.random() < SCALE_PROB:
                     scale = random.uniform(SCALE_RANGE[0], SCALE_RANGE[1])
@@ -240,7 +274,6 @@ class LabelMeCornerDataset(Dataset):
                         
                         # ★修正点5: 有効なキーポイントの座標「だけ」をシフト
                         pts[valid_indices] = pts[valid_indices] + [left, upper]
-
                 #? 3. ランダム回転
                 if random.random() < ROTATE_PROB:
                     angle = random.uniform(-ROTATE_DEGREE, ROTATE_DEGREE)
@@ -256,41 +289,6 @@ class LabelMeCornerDataset(Dataset):
                     # 回転後の座標を計算して更新
                     pts[valid_indices, 0] = cx + (x0) * math.cos(angle_r) - (y0) * math.sin(angle_r)
                     pts[valid_indices, 1] = cy + (x0) * math.sin(angle_r) + (y0) * math.cos(angle_r)   
-
-                #? 3.5. 背景の一部を黒く塗りつぶす（ゲート領域はマスク）
-                from config import BG_MASK_PROB, BG_MASK_RECT_MIN, BG_MASK_RECT_MAX, BG_MASK_LINE_WIDTH, BG_MASK_CIRCLE_RADIUS, BG_MASK_MARGIN
-                import cv2
-                if random.random() < BG_MASK_PROB and any(mask):
-                    pts_valid = [tuple(pts[i]) for i in range(len(pts)) if mask[i*2] > 0 and mask[i*2+1] > 0]
-                    mask_img = Image.new('L', img.size, 0)
-                    draw = ImageDraw.Draw(mask_img)
-                    if len(pts_valid) >= 3:
-                        draw.polygon(pts_valid, outline=1, fill=1)
-                    elif len(pts_valid) == 2:
-                        draw.line(pts_valid, fill=1, width=BG_MASK_LINE_WIDTH)
-                        r = BG_MASK_CIRCLE_RADIUS
-                        for x, y in pts_valid:
-                            draw.ellipse((x-r, y-r, x+r, y+r), fill=1)
-                    elif len(pts_valid) == 1:
-                        x, y = pts_valid[0]
-                        r = BG_MASK_CIRCLE_RADIUS
-                        draw.ellipse((x-r, y-r, x+r, y+r), fill=1)
-                    mask_np = np.array(mask_img)
-                    # --- ここでマスクを膨張 ---
-                    if BG_MASK_MARGIN > 0:
-                        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (BG_MASK_MARGIN*2+1, BG_MASK_MARGIN*2+1))
-                        mask_np = cv2.dilate(mask_np, kernel)
-                    img_np = np.array(img).copy()
-                    h, w = img_np.shape
-                    for _ in range(5):
-                        rw = random.randint(BG_MASK_RECT_MIN, BG_MASK_RECT_MAX)
-                        rh = random.randint(BG_MASK_RECT_MIN, BG_MASK_RECT_MAX)
-                        rx = random.randint(0, w - rw)
-                        ry = random.randint(0, h - rh)
-                        if np.all(mask_np[ry:ry+rh, rx:rx+rw] == 0):
-                            img_np[ry:ry+rh, rx:rx+rw] = 0
-                            break
-                    img = Image.fromarray(img_np)
                 #? 4. コントラスト変換
                 if random.random() < CONTRAST_PROB:
                     from PIL import ImageEnhance
