@@ -4,7 +4,7 @@ from glob import glob
 
 # ====== 設定ここから ======
 TARGET_FOLDER = r'160data/dataset'  # 対象フォルダ
-START_NUM =475                # 連番の開始番号
+START_NUM =1                # 連番の開始番号
 # ====== 設定ここまで ======
 
 IMG_EXTS = ['.jpg', '.jpeg', '.png', '.bmp']
