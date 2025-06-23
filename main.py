@@ -663,9 +663,9 @@ def main():
                 plt.tight_layout()
                 plt.savefig(os.path.join(session_dir, 'metrics_bar.png'))
                 plt.close()
-                print("=======================================================================")
+                print("============================================================================")
                 print(f"Mean：{mean_err:.4f}　Median：{median_err:.4f}　Max：{max_err:.4f}　acc5：{acc5:.4f}　acc10：{acc10:.4f}")
-                print("=======================================================================")
+                print("============================================================================")
                 
         # --- 指標計算 ---
         mean_err, errors, point_errors, median_err = mean_error(model, test_loader, device)
