@@ -5,4 +5,4 @@ img/*
 img_out/*
 logs/*
 nets/__pycache__/
-tmep/*
+temp/*
