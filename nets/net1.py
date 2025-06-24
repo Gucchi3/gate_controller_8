@@ -5,6 +5,44 @@ import torch.nn as nn
 class net1_ex(nn.Module):
     def __init__(self):
         super(net1_ex, self).__init__()
+        class SEBlock(nn.Module):
+            """
+            Squeeze-and-Excitation Blockを実装したPyTorchモジュール。
+            """
+            def __init__(self, channels: int, reduction_ratio: int = 16):
+                """
+                Args:
+                    channels (int): 入力および出力の特徴マップのチャンネル数。
+                    reduction_ratio (int, optional): 中間層のチャンネル削減率。デフォルトは16。
+                """
+                super().__init__()
+                
+                # 中間層のチャンネル数が最低でも1になるように設定
+                squeezed_channels = max(1, channels // reduction_ratio)
+
+                self.squeeze = nn.AdaptiveAvgPool2d(1)
+                self.excitation = nn.Sequential(
+                    nn.Linear(channels, squeezed_channels, bias=False),
+                    nn.ReLU(inplace=True),
+                    nn.Linear(squeezed_channels, channels, bias=False),
+                    nn.Sigmoid()
+                )
+
+            def forward(self, x: torch.Tensor) -> torch.Tensor:
+                batch_size, num_channels, _, _ = x.shape
+                
+                # Squeeze
+                y = self.squeeze(x).view(batch_size, num_channels)
+                
+                # Excitation
+                y = self.excitation(y).view(batch_size, num_channels, 1, 1)
+                
+                # Scale (入力テンソルに重みを乗算)
+                return x * y.expand_as(x)
+
+        self.SEBlock1 = SEBlock(channels=32, reduction_ratio=8)
+        self.SEBlock2 = SEBlock(channels=48, reduction_ratio=8)
+        self.SEBlock3 = SEBlock(channels=48, reduction_ratio=8)
         # conv1ブロック
         self.conv1 = nn.Conv2d(1, 16, kernel_size=3, stride=1, padding=1)
         self.bn1 = nn.BatchNorm2d(16)
@@ -57,6 +95,7 @@ class net1_ex(nn.Module):
         x = self.conv2(x)
         x = self.bn2(x)
         x = self.relu2(x)
+        x = self.SEBlock1(x)
         # x = self.conv2b(x)
         # x = self.bn2b(x)
         # x = self.relu2b(x)
@@ -66,6 +105,7 @@ class net1_ex(nn.Module):
         x = self.conv3(x)
         x = self.bn3(x)
         x = self.relu3(x)
+        x = self.SEBlock2(x)
         # x = self.conv3b(x)
         # x = self.bn3b(x)
         # x = self.relu3b(x)
@@ -75,6 +115,7 @@ class net1_ex(nn.Module):
         x = self.conv4(x)
         x = self.bn4(x)
         x = self.relu4(x)
+        x = self.SEBlock3(x)
         # x = self.conv4b(x)
         # x = self.bn4b(x)
         # x = self.relu4b(x)

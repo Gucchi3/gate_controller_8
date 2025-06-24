@@ -3,8 +3,8 @@ import os
 #共通設定値（パス、ハイパーパラメータ、カラーマップなど）
 PARENT_DIR    = r'.'   # 親フォルダ
 IMG_DIR       = os.path.join(PARENT_DIR, 'img')      # 推論用画像フォルダ
-DATASET_DIR   = os.path.join(PARENT_DIR, 'dataset')  # 学習用画像フォルダ
-JSON_DIR      = os.path.join(PARENT_DIR, 'json')     # <parent>/json
+DATASET_DIR   = os.path.join(PARENT_DIR, 'dataset2')  # 学習用画像フォルダ
+JSON_DIR      = os.path.join(PARENT_DIR, 'json2')     # <parent>/json
 OUT_DIR       = os.path.join(PARENT_DIR, 'log')      # モデル・ログ保存先
 IMG_OUT_DIR   = os.path.join(PARENT_DIR, 'img_out')  # 予測画像出力先
 HEATIMG_OUT_DIR   = os.path.join(PARENT_DIR, 'log/heatmap')  # 予測画像出力先
@@ -34,17 +34,24 @@ ROTATE_PROB = 0.5       # ランダム回転の確率
 ROTATE_DEGREE = 15      # 回転角度の最大値（±）
 SCALE_PROB = 0.6        # 拡大縮小の確率
 SCALE_RANGE = (0.4,1.2) # 拡大縮小の倍率範囲（min, max）
-CONTRAST_PROB = 0     # コントラスト変換の確率
+CONTRAST_PROB = 0.5     # コントラスト変換の確率
 CONTRAST_RANGE = (0.6, 1.4) # コントラスト倍率範囲
-BRIGHTNESS_PROB = 0   # 明るさ変換の確率
+BRIGHTNESS_PROB = 0.5   # 明るさ変換の確率
 BRIGHTNESS_RANGE = (0.6, 1.4) # 明るさ倍率範囲
-SHARPNESS_PROB = 0  # シャープネス変換の確率
+SHARPNESS_PROB = 0.5  # シャープネス変換の確率
 SHARPNESS_RANGE = (0.6, 1.4) # シャープネス倍率範囲
-NOIZ_PROB  =  0  #ノイズ付加確率
+NOIZ_PROB  =  0.5  #ノイズ付加確率
 NOIZ_MU  = 0
-NOIZ_SIGMA = 10
+NOIZ_SIGMA = 5
 BLUR_PROB = 0.5
-
+# 背景マスク拡張用パラメータ
+BG_MASK_PROB = 0.6  # 適用確率（例: 0.3=30%）
+NUM_MASK = 2     #マスク数
+BG_MASK_RECT_MIN = 20  # 塗りつぶし矩形の最小一辺
+BG_MASK_RECT_MAX = 70  # 塗りつぶし矩形の最大一辺
+BG_MASK_MARGIN = 10  # ゲートから最低何ピクセル離すか
+BG_MASK_LINE_WIDTH = 10  # 2点時の線の太さ
+BG_MASK_CIRCLE_RADIUS = 10  # 1点/2点時の円の半径
 # 入力画像保存のON/OFFと保存先ディレクトリ
 SAVE_INPUT_IMG = True  # Trueで保存、Falseで保存しない
 INPUT_IMG_DIR = r'log/input_img'  # 保存先ディレクトリ名
@@ -54,11 +61,3 @@ GATE_EXIST_LOSS_WEIGHT = 1.0  # 必要に応じて調整
 # ゲート存在判定の閾値
 GATE_EXIST_THRESH = 0.5
 
-# 背景マスク拡張用パラメータ
-BG_MASK_PROB = 1  # 適用確率（例: 0.3=30%）
-NUM_MASK = 3     #マスク数
-BG_MASK_RECT_MIN = 20  # 塗りつぶし矩形の最小一辺
-BG_MASK_RECT_MAX = 70  # 塗りつぶし矩形の最大一辺
-BG_MASK_MARGIN = 10  # ゲートから最低何ピクセル離すか
-BG_MASK_LINE_WIDTH = 10  # 2点時の線の太さ
-BG_MASK_CIRCLE_RADIUS = 10  # 1点/2点時の円の半径
