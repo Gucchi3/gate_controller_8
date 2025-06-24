@@ -51,30 +51,7 @@ REQUIRED_LABELS = POINT_LABEL
 import torch
 import torch.nn as nn
 
-class WingLoss(nn.Module):
-    def __init__(self, w=10, epsilon=2):
-        super(WingLoss, self).__init__()
-        self.w = w
-        self.epsilon = epsilon
-        # C = w - w * ln(1 + w/epsilon)
-        self.C = self.w - self.w * math.log(1 + self.w / self.epsilon)
 
-    def forward(self, pred, target, mask=None):
-        # 誤差を計算
-        delta = (pred - target).abs()
-        
-        # 損失を計算
-        loss_small = self.w * torch.log(1 + delta / self.epsilon)
-        loss_large = delta - self.C
-        
-        loss = torch.where(delta < self.w, loss_small, loss_large)
-        
-        # マスクを適用
-        if mask is not None:
-            loss = loss * mask
-            return loss.sum() / (mask.sum() + 1e-6)
-        else:
-            return loss.mean()
 #?--------------------------------------------------------------------------------------
 #?　Dataset
 #? -------------------------------------------------------------------------------------
@@ -398,6 +375,33 @@ class LabelMeCornerDataset(Dataset):
 #? -------------------------------------------------------------------------------------
 #?　Training / Validation
 #? -------------------------------------------------------------------------------------
+
+#? 損失関数_WingLoss
+class WingLoss(nn.Module):
+    
+    def __init__(self, w=10, epsilon=2):
+        super(WingLoss, self).__init__()
+        self.w = w
+        self.epsilon = epsilon
+        # C = w - w * ln(1 + w/epsilon)
+        self.C = self.w - self.w * math.log(1 + self.w / self.epsilon)
+
+    def forward(self, pred, target, mask=None):
+        # 誤差を計算
+        delta = (pred - target).abs()
+        
+        # 損失を計算
+        loss_small = self.w * torch.log(1 + delta / self.epsilon)
+        loss_large = delta - self.C
+        
+        loss = torch.where(delta < self.w, loss_small, loss_large)
+        
+        # マスクを適用
+        if mask is not None:
+            loss = loss * mask
+            return loss.sum() / (mask.sum() + 1e-6)
+        else:
+            return loss.mean()
 #? 1エポック分の学習を実行し、平均lossを返す
 # 入力: model(torch.nn.Module), loader(DataLoader), optimizer(torch.optim.Optimizer), device(torch.device), writer(SummaryWriter), epoch(int)
 # 出力: 平均loss (float)
