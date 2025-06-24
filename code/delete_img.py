@@ -3,7 +3,7 @@ import cv2
 
 # ====== 設定ここから ======
 # 対象フォルダのパス
-TARGET_FOLDER = r'160data\data6f'  # 例: 'dataset' フォルダ
+TARGET_FOLDER = r'dataset'  # 例: 'dataset' フォルダ
 
 # 残すキー・捨てるキー（OpenCVのwaitKeyで使うのでordで指定）
 KEEP_KEY = ord('d')  # 残す
@@ -14,7 +14,7 @@ DELETE_KEY = ord('f')  # 捨てる
 IMG_EXTS = ['.jpg', '.jpeg', '.png', '.bmp']
 
 # 最大ウィンドウサイズ（px）
-MAX_WIN_W, MAX_WIN_H = 800, 800
+MAX_WIN_W, MAX_WIN_H = 500, 500
 
 # 画像ファイル一覧取得
 img_files = [f for f in os.listdir(TARGET_FOLDER)
